@@ -23,8 +23,8 @@
 { lib, fetchurl, runCommand, bootstrapProfile }:
 
 let
-  release = import "${bootstrapProfile}/release.nix";
-  specs = import "${bootstrapProfile}/pkgs.nix";
+  release = import (bootstrapProfile + "/release.nix");
+  specs = import (bootstrapProfile + "/pkgs.nix");
   fetch = spec: {
     pkg = fetchurl {
       inherit (spec) url sha256;
