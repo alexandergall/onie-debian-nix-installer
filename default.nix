@@ -93,6 +93,7 @@ in vmTools.runInLinuxVM (
     debootstrap --unpack-tarball=${bootstrap.tarball} ${bootstrap.release} $chroot
     mount -t devtmpfs devtmpfs $chroot/dev
     mount -t devpts devpts $chroot/dev/pts
+    ln -s /proc/self/fd $chroot/dev/fd
     exec_chroot  /usr/sbin/update-initramfs -u
     echo "localhost" >$chroot/etc/hostname
     cp -r -t $chroot ${fileTree}/*
