@@ -28,18 +28,20 @@ for p in $(seq 3 9); do
 done
 partprobe ${disk}
 
-info "Creating partition ${disk}4"
-sgdisk -N 4 ${disk}
-sgdisk -c 4:$NOS ${disk}
+NOS_part=3
+NOS_disk=${disk}${NOS_part}
+info "Creating partition $NOS_disk"
+sgdisk -N $NOS_part ${disk}
+sgdisk -c $NOS_part:$NOS ${disk}
 sgdisk -p ${disk}
 partprobe ${disk}
 
 info "Formatting root partition"
 ROOT_UUID=9e3f4c2b-0bb2-4ff1-b204-fc83d95d443e
-mkfs.ext3 -F -U $ROOT_UUID ${disk}4
+mkfs.ext3 -F -U $ROOT_UUID $NOS_disk
 root=/mnt
 mkdir -p $root
-mount ${disk}4 $root
+mount $NOS_disk $root
 
 info "Unpacking rootfs"
 tar xJf rootfs.tar.xz -C $root
