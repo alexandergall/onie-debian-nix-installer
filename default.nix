@@ -1,12 +1,12 @@
-{ lib, callPackage, fetchurl, vmTools, runCommand, debootstrap,
+{ lib, stdenv, callPackage, fetchurl, vmTools, runCommand, debootstrap,
   mount, umount, shadow, rsync, gnutar, xz, gnused, gawk, closureInfo }:
 
 {
   ## List of paths to be installed in nixProfile
-  rootPaths
+  rootPaths ? []
   ## The Nix profile in which to install the service, e.g.
   ## /nix/var/nix/profiles/per-user/root/my-profile
-, nixProfile
+, nixProfile ? "/nix/var/nix/profiles/service"
   ## A list of binary cache URL and keys to add to the image.
   ## Each element is an attribute set with attributes "name"
   ## and "key"
@@ -16,20 +16,31 @@
 , bootstrapProfile
   ## A derivation containing a directory tree to be copied
   ## into the root file system after bootstrapping
-, fileTree
+, fileTree ? (stdenv.mkDerivation {
+    name = "empty";
+    phases = [ "installPhase" ];
+    installPhase = "mkdir $out";
+  })
   ## Initial root password.  The default sshd config does
   ## not allow root logins with password authentication.
 , rootPassword ? ""
   ## The command to execute in the chroot of the new system
   ## after the profile has been installed.
-, activationCmd ? true
-  ## Whether to ignore a non-zero exit code of activationCmd.
-, activationErrorIgnore ? true
+, activationCmd ? ""
   ## Name of the installer binary, will have ".bin" appended
 , installerName ? "onie-installer"
-  ## Name to use as the NOS, ends up in partition label and
-  ## GRUB_DISTRIBUTOR
+  ## Name to use as the NOS, used as partition label and in
+  ## informational messages of install.sh
 , NOS ? "NOS"
+  ## GRUB configuration
+, grubDefault ? builtins.toFile "grub-default" ''
+    GRUB_DEFAULT=0
+    GRUB_TIMEOUT=5
+    GRUB_DISTRIBUTOR="NOS"
+    GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0"
+    GRUB_CMDLINE_LINUX=""
+    GRUB_TERMINAL="console"
+  ''
   ## component and version are arbitrary strings which are written to
   ## like-named files in the derivation.  They can be used to identify
   ## the system for which the installer was built, e.g. by a Hydra
@@ -82,21 +93,24 @@ in vmTools.runInLinuxVM (
       echo ${component} >$out/component
       echo ${version} >$out/version
     '';
-  } ''
+  } (''
     chroot=/chroot
     mkdir $chroot
-    
+
     exec_chroot () {
       chroot $chroot /bin/env PATH=/bin:/usr/bin:/sbin:/usr/sbin "$@"
     }
 
     debootstrap --unpack-tarball=${bootstrap.tarball} ${bootstrap.release} $chroot
+    cp ${grubDefault} $chroot/etc/default/grub
     mount -t devtmpfs devtmpfs $chroot/dev
     mount -t devpts devpts $chroot/dev/pts
     ln -s /proc/self/fd $chroot/dev/fd
     exec_chroot  /usr/sbin/update-initramfs -u
     echo "localhost" >$chroot/etc/hostname
-    cp -r -t $chroot ${fileTree}/*
+    if [ "$(ls -A ${fileTree})" ]; then
+      cp -r -t $chroot ${fileTree}/*
+    fi
     exec_chroot sh -c 'hostname $(cat /etc/hostname)'
     exec_chroot locale-gen
     echo "root:${rootPassword}" | chpasswd --root $chroot -c SHA256
@@ -132,6 +146,7 @@ in vmTools.runInLinuxVM (
     rm $chroot/etc/sudoers.d/nix
     exec_chroot userdel nix
 
+  '' + (lib.optionalString (builtins.length rootPaths > 0) ''
     ### Install the service
     PROFILE=${nixProfile}
     NIX_PATH=/nix/var/nix/profiles/default/bin
@@ -147,14 +162,16 @@ in vmTools.runInLinuxVM (
     ## that the directory does not exist.
     exec_chroot sh -c "HOME=/tmp; $NIX_PATH/nix-env -p $PROFILE -i ${lib.strings.concatStringsSep " " rootPaths} --option sandbox false"
 
-    echo "Activating the service with ${activationCmd}"
-    exec_chroot ${activationCmd} || ${if activationErrorIgnore then "true" else "false"}
-
+    if [ -n "${activationCmd}" ]; then
+      echo "Activating the service with ${activationCmd}"
+      exec_chroot ${activationCmd}
+    fi
+  '') + ''
     umount $chroot/dev/pts
     umount $chroot/dev
     umount $chroot/proc
     umount $chroot/sys
 
     tar -cf /tmp/xchg/rootfs.tar -C $chroot .
-  ''
+  '')
 )

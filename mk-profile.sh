@@ -8,7 +8,7 @@
 ###   * Take that snapshot and remove the .deb files
 ###   * Use nix-prefetch-url to determine the sha256 hashes
 ###     of the packages
-###   * Write the URLs and hashes to file as a Nix expression
+###   * Write the URLs and hashes to a file as a Nix expression
 ###
 ### The function in bootstrap-from-profile.nix takes the Nix
 ### expression form the file, fetches the packages with fetchurl and
@@ -29,7 +29,7 @@ usage () {
 default_packages="linux-image-amd64,initramfs-tools,sudo,zip,unzip,\
                   openssh-server,openssh-client,telnet,grub-efi-amd64,\
                   efibootmgr,acpi,ethtool,net-tools,wget,curl,rsync,locales,\
-                  ca-certificates"
+                  ca-certificates,dbus"
 [ $# -ge 1 ] || usage
 release=$1
 shift

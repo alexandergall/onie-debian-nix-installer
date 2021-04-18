@@ -16,7 +16,7 @@ info () {
 ## Install NOS on same block device as ONIE
 disk=$(onie_get_boot_disk)
 
-NOS=$(cat installer/nos)
+NOS="$(cat installer/nos)"
 info "Installing $NOS on ${disk}"
 sgdisk -p ${disk}
 
@@ -32,7 +32,7 @@ NOS_part=3
 NOS_disk=${disk}${NOS_part}
 info "Creating partition $NOS_disk"
 sgdisk -N $NOS_part ${disk}
-sgdisk -c $NOS_part:$NOS ${disk}
+sgdisk -c $NOS_part:"$NOS" ${disk}
 sgdisk -p ${disk}
 partprobe ${disk}
 
@@ -88,7 +88,7 @@ for b in $(efibootmgr | awk "/$NOS/ { print \$1 }"); do
   num=${num%\*}
   efibootmgr -b $num -B
 done
-. $root/etc/default/grub
+GRUB_DISTRIBUTOR=$(chroot $root sh -c '. /etc/default/grub; echo $GRUB_DISTRIBUTOR')
 efibootmgr -c -d ${disk} -p 1 -L "$NOS" -l "\EFI\\$GRUB_DISTRIBUTOR\grubx64.efi"
 
 sync
