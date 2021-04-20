@@ -29,7 +29,7 @@ usage () {
 default_packages="linux-image-amd64,initramfs-tools,sudo,zip,unzip,\
                   openssh-server,openssh-client,telnet,grub-efi-amd64,\
                   efibootmgr,acpi,ethtool,net-tools,wget,curl,rsync,locales,\
-                  ca-certificates,dbus"
+                  ca-certificates,dbus,xz-utils,emacs-nox"
 [ $# -ge 1 ] || usage
 release=$1
 shift
