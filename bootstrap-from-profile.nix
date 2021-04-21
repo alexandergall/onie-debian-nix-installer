@@ -44,7 +44,7 @@ let
     cd out
     tar xf "${bootstrapProfile}/bootstrap.tar";
   '' + (lib.strings.concatStrings (map cpDeb debs)) + ''
-    tar czf $out * 
+    tar --owner=root --group=root -czf $out *
   '');
 in {
   inherit tarball release;
