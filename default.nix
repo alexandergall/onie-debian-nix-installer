@@ -2,11 +2,15 @@
   mount, umount, shadow, rsync, gnutar, xz, gnused, gawk, closureInfo }:
 
 {
-  ## List of paths to be installed in nixProfile
+  ## List of paths whose closure will be added to the Nix store
+  ## of the install image
   rootPaths ? []
-  ## The Nix profile in which to install the service, e.g.
-  ## /nix/var/nix/profiles/per-user/root/my-profile
-, nixProfile ? "/nix/var/nix/profiles/service"
+  ## A command that will be executed inside a chroot after Nix has
+  ## been installed into the root file system
+, postRootFsCreateCmd ? null
+  ## A command that will be executed inside a chroot after unpacking
+  ## the root file system on the installation target
+, postRootFsInstallCmd ? null
   ## A list of binary cache URL and keys to add to the image.
   ## Each element is an attribute set with attributes "name"
   ## and "key"
@@ -24,9 +28,6 @@
   ## Initial root password.  The default sshd config does
   ## not allow root logins with password authentication.
 , rootPassword ? ""
-  ## The command to execute in the chroot of the new system
-  ## after the profile has been installed.
-, activationCmd ? ""
   ## Name of the installer binary, will have ".bin" appended
 , installerName ? "onie-installer"
   ## Name to use as the NOS, used as partition label and in
@@ -36,8 +37,8 @@
 , grubDefault ? builtins.toFile "grub-default" ''
     GRUB_DEFAULT=0
     GRUB_TIMEOUT=5
-    GRUB_DISTRIBUTOR="NOS"
-    GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0"
+    GRUB_DISTRIBUTOR="${NOS}"
+    GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0,57600n8"
     GRUB_CMDLINE_LINUX=""
     GRUB_TERMINAL="console"
   ''
@@ -48,6 +49,8 @@
   ## directory.
 , component ? ""
 , version ? ""
+  ## Size of the VM in MiB
+, memSize ? 4096
 }:
 
 let
@@ -62,11 +65,11 @@ let
     }
   ];
   aggrBinaryCaches = lib.foldAttrs (n: a: n + " " + a) "" (defaultBinaryCaches ++ binaryCaches);
-  serviceClosureInfo = closureInfo { inherit rootPaths; };
   bootstrap = callPackage ./bootstrap-from-profile.nix { inherit bootstrapProfile; };
+  rootClosureInfo = closureInfo { inherit rootPaths; };
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
-    memSize = 4096;
+    inherit memSize;
     buildInputs = [ debootstrap mount umount shadow rsync ];
     postVM = ''
       cd xchg
@@ -74,13 +77,15 @@ in vmTools.runInLinuxVM (
       installer=$out/${installerName}.bin
 
       echo "Compressing rootfs"
-      ${xz}/bin/xz -T0 rootfs.tar
+      ${xz}/bin/xz -T0 rootfs.tar -c | cat >$out/rootfs.tar.xz
 
       echo "Creating payload"
+      cd $out
       mkdir installer
       cp ${./onie/install.sh} installer/install.sh
       echo ${NOS} >installer/nos
       ${gnutar}/bin/tar cf payload.tar installer rootfs.tar.xz
+      rm -rf installer rootfs.tar.xz
 
       echo "Calculating checksum"
       sha1=`sha1sum payload.tar | ${gawk}/bin/awk '{print $1}'`
@@ -92,6 +97,7 @@ in vmTools.runInLinuxVM (
       cat payload.tar >> $installer
       echo ${component} >$out/component
       echo ${version} >$out/version
+      rm payload.tar
     '';
   } (''
     chroot=/chroot
@@ -106,7 +112,8 @@ in vmTools.runInLinuxVM (
     mount -t devtmpfs devtmpfs $chroot/dev
     mount -t devpts devpts $chroot/dev/pts
     ln -s /proc/self/fd $chroot/dev/fd
-    exec_chroot  /usr/sbin/update-initramfs -u
+    exec_chroot apt-get clean
+    exec_chroot /usr/sbin/update-initramfs -u
     echo "localhost" >$chroot/etc/hostname
     if [ "$(ls -A ${fileTree})" ]; then
       cp -r -t $chroot ${fileTree}/*
@@ -146,27 +153,22 @@ in vmTools.runInLinuxVM (
     rm $chroot/etc/sudoers.d/nix
     exec_chroot userdel nix
 
-  '' + (lib.optionalString (builtins.length rootPaths > 0) ''
-    ### Install the service
-    PROFILE=${nixProfile}
-    NIX_PATH=/nix/var/nix/profiles/default/bin
-
-    echo
-    echo "Copying service closure to chroot"
-    rsync -a $(cat ${serviceClosureInfo}/store-paths) $chroot/nix/store
-    cat ${serviceClosureInfo}/registration | exec_chroot $NIX_PATH/nix-store --load-db
-
-    echo "Installing initial profile $PROFILE"
-    ## Without setting HOME, nix-env creates /homeless-shelter to create
-    ## a link for the Nix channel. That confuses the builder, which insists
-    ## that the directory does not exist.
-    exec_chroot sh -c "HOME=/tmp; $NIX_PATH/nix-env -p $PROFILE -i ${lib.strings.concatStringsSep " " rootPaths} --option sandbox false"
-
-    if [ -n "${activationCmd}" ]; then
-      echo "Activating the service with ${activationCmd}"
-      exec_chroot ${activationCmd}
+    if [ -s ${rootClosureInfo}/store-paths ]; then
+      echo
+      echo "Copying closure to chroot"
+      rsync -a $(cat ${rootClosureInfo}/store-paths) $chroot/nix/store
+      cat ${rootClosureInfo}/registration | exec_chroot /nix/var/nix/profiles/default/bin/nix-store --load-db
     fi
-  '') + ''
+  '' +
+   (lib.optionalString (postRootFsCreateCmd != null) ''
+     cp ${postRootFsCreateCmd} $chroot/cmd
+     exec_chroot /cmd
+     rm $chroot/cmd
+   '') +
+   (lib.optionalString (postRootFsInstallCmd != null) ''
+     cp ${postRootFsInstallCmd} $chroot/post-install-cmd
+   '') +
+  ''
     umount $chroot/dev/pts
     umount $chroot/dev
     umount $chroot/proc

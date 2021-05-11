@@ -49,10 +49,18 @@ mount -t sysfs -o nodev,noexec,nosuid none $root/sys
 mount -t proc -o nodev,noexec,nosuid none $root/proc
 mount -t devtmpfs devtmpfs $root/dev
 mount -t devpts devpts $root/dev/pts
+ln -s /proc/self/fd $root/dev/fd
 ## The busybox tar doesn't preserve modification
 ## timestamps. Fix at least the store paths.
 info "Fixing timestamps in Nix store"
 chroot $root find /nix/store -exec touch -h --date=@0 {} \;
+cp /etc/machine.conf $root/etc/
+
+if [ -x $root/post-install-cmd ]; then
+   info "Executing post-install command"
+   chroot $root /post-install-cmd
+   rm $root/post-install-cmd
+fi
 
 info "Installing GRUB"
 echo "UUID=$ROOT_UUID / ext4 errors=remount-ro 0 1" > $root/etc/fstab
