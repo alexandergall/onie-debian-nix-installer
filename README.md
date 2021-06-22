@@ -31,9 +31,20 @@ The script produces three files as output
    * `release`. A Nix expression that evaluates to a string containing
      the Debian release with which `mk-profile.sh` was called.
 
-These files need to be copied to the project that wants to create an
-ONIE installer.  Within that project's Nix expression, import this
-repository and call the resulting function to build the installer
+The original URL used by `debootstrap` points to the regular Debian
+site `deb.debian.org`. This is a problem if the current stable release
+is used to create the profile, because `.deb` files can change as the
+stable release progresses through its update cycle.  As a consequence,
+building the ONIE installer at a later time can fail.  For this
+reason, the URLs are replaced by ones realative to
+`snapshot.debian.org`, which contains an archive of all `.deb` files
+ever created.  These URLs are stable over time and should allow for
+builds of the ONIE installer at any point in the future.
+
+The three files produced by `mk-profile.sh` need to be copied to the
+project that wants to create an ONIE installer.  Within that project's
+Nix expression, import this repository and call the resulting function
+to build the installer
 
 ```Nix
   ## pkgs is an instance of a Nix package collection

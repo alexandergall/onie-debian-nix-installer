@@ -58,14 +58,19 @@ done < <(tar xf $tarball debootstrap/debpaths --to-stdout)
 
 out=pkgs.nix
 echo "Creating Nix expression for URLs and hashes"
+
+## Find a timestamp on snapshot.debian.org
+timestamp=$(wget -q -O- 'https://snapshot.debian.org/archive/debian/?'$(date '+year=%Y&month=%m&day=%d') | grep -oP '([0-9]{8}T[0-9]{6}Z/)' | tail -1)
+
 exec 3>&1 1>$out
 n=0
 echo "# Generated from debootstrap --include=$packages"
 echo "["
 while read name version url; do
-    hash=$(nix-prefetch-url --name none $url 2>/dev/null)
+    snapshotURL=http://snapshot.debian.org/archive/debian/$timestamp/$(echo $url | sed -e 's/.*\(pool\/.*\)/\1/')
+    hash=$(nix-prefetch-url --name none $snapshotURL 2>/dev/null)
     echo "  {"
-    echo "    url = $url;"
+    echo "    url = $snapshotURL;"
     echo "    sha256 = \"$hash\";"
     echo "    name = \"$(basename ${paths[$name]})\";"
     echo "  }"
