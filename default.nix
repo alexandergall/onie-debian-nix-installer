@@ -33,15 +33,16 @@
   ## Name to use as the NOS, used as partition label and in
   ## informational messages of install.sh
 , NOS ? "NOS"
-  ## GRUB configuration
-, grubDefault ? builtins.toFile "grub-default" ''
-    GRUB_DEFAULT=0
-    GRUB_TIMEOUT=5
-    GRUB_DISTRIBUTOR="${NOS}"
-    GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0,57600n8"
-    GRUB_CMDLINE_LINUX=""
-    GRUB_TERMINAL="console"
-  ''
+  ## GRUB configuration to be installed in /etc/default/grub.  The
+  ## values of the attributes must be store paths that consis of a
+  ## single file in the format expected by /etc/default/grub. The
+  ## default file is installed as /etc/default/grub. All other
+  ## attributes are installed as
+  ## /etc/default/grub-platforms/<attribute>.  At install time, it is
+  ## checked whether the file
+  ## /etc/default/grub-platforms/<onie_machine> exists.  If so, it is
+  ## copied to /etc/default/grub. /etc/default/grub-platforms is deleted.
+, grubDefault ? {}
   ## component and version are arbitrary strings which are written to
   ## like-named files in the derivation.  They can be used to identify
   ## the system for which the installer was built, e.g. by a Hydra
@@ -67,6 +68,25 @@ let
   aggrBinaryCaches = lib.foldAttrs (n: a: n + " " + a) "" (defaultBinaryCaches ++ binaryCaches);
   bootstrap = callPackage ./bootstrap-from-profile.nix { inherit bootstrapProfile; };
   rootClosureInfo = closureInfo { inherit rootPaths; };
+  cpGrubDefault = platform: file:
+    ''
+      mkdir -p $chroot/etc/default/grub-platforms
+      if [ ${platform} == default ]; then
+        cp ${file} $chroot/etc/default/grub
+      else
+        cp ${file} $chroot/etc/default/grub-platforms/${platform}
+      fi
+    '';
+  cpGrubDefaults = builtins.concatStringsSep "\n"
+    (lib.mapAttrsToList cpGrubDefault ({
+      default = builtins.toFile "grub-default" ''
+        GRUB_DEFAULT=0
+        GRUB_TIMEOUT=5
+        GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0"
+        GRUB_CMDLINE_LINUX=""
+        GRUB_TERMINAL="console"
+      '';
+    } // grubDefault));
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
     inherit memSize;
@@ -108,7 +128,7 @@ in vmTools.runInLinuxVM (
     }
 
     debootstrap --unpack-tarball=${bootstrap.tarball} ${bootstrap.release} $chroot
-    cp ${grubDefault} $chroot/etc/default/grub
+    ${cpGrubDefaults}
     mount -t devtmpfs devtmpfs $chroot/dev
     mount -t devpts devpts $chroot/dev/pts
     ln -s /proc/self/fd $chroot/dev/fd

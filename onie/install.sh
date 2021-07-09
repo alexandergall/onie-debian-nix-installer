@@ -87,17 +87,37 @@ menuentry ONIE {
 EOF
 chmod a+x $root/etc/grub.d/42_ONIE_BOOT
 
+## Install platform-specific GRUB defaults
+if [ -d $root/etc/default/grub-platforms ]; then
+    . /etc/machine.conf
+    if [ -e $root/etc/default/grub-platforms/${onie_machine} ]; then
+	info "Installing GRUB default for $onie_machine"
+	mv $root/etc/default/grub-platforms/${onie_machine} $root/etc/default/grub
+    fi
+    rm -rf $root/etc/default/grub-platforms
+fi
+
+## By default, grub-install infers the EFI boot loader ID from
+## /etc/default/grub by the following rules.
+##   * If GRUB_DISTRIBUTOR is set, extract the word up to the
+##     first space and convert it to lower case
+##   * If GRUB_DISTRIBUTOR is not set, use "grub"
+## We force the boot loader ID to be "grub" here. Whenever
+## grub-install is called from the OS at a later time, it may create a
+## new loader in /boot/efi/EFI depending on the setting of
+## GRUB_DISTRIBUTOR. That will not be a problem.
+bootloader_id=grub
 chroot $root update-grub
-chroot $root grub-install ${disk}
+chroot $root grub-install --bootloader-id=${bootloader_id} ${disk}
 
 info "Updating EFI boot order"
 for b in $(efibootmgr | awk "/$NOS/ { print \$1 }"); do
   num=${b#Boot}
   num=${num%\*}
+  info "Removing existing boot entry $b"
   efibootmgr -b $num -B
 done
-GRUB_DISTRIBUTOR=$(chroot $root sh -c '. /etc/default/grub; echo $GRUB_DISTRIBUTOR')
-efibootmgr -c -d ${disk} -p 1 -L "$NOS" -l "\EFI\\$GRUB_DISTRIBUTOR\grubx64.efi"
+efibootmgr -c -d ${disk} -p 1 -L "$NOS" -l "\EFI\\${bootloader_id}\grubx64.efi"
 
 sync
 reboot

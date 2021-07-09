@@ -36,7 +36,7 @@ site `deb.debian.org`. This is a problem if the current stable release
 is used to create the profile, because `.deb` files can change as the
 stable release progresses through its update cycle.  As a consequence,
 building the ONIE installer at a later time can fail.  For this
-reason, the URLs are replaced by ones realative to
+reason, the URLs are replaced by ones relative to
 `snapshot.debian.org`, which contains an archive of all `.deb` files
 ever created.  These URLs are stable over time and should allow for
 builds of the ONIE installer at any point in the future.
@@ -75,7 +75,7 @@ The function takes the following arguments
      install target's platform type is available from the file
      `/etc/machine.conf` in the `chroot` environment. The file is a
      copy of `machine.conf` from the ONIE install partition. It can be
-     sourced as a schell script, which makes the platform available as
+     sourced as a shell script, which makes the platform available as
      the `onie_machine` variable.  `postRootFsInstallCmd` must be a
      derivation that evaluates to a single executable in the Nix
      store.  The default is `null` which disable the feature.
@@ -101,25 +101,37 @@ The function takes the following arguments
      (in ONIE terminology). This name is used in the partition label
      of the Debian root partition and informational messages issued
      during the install. The default is the string `NOS`.
-   * `grubDefault`. **Optional**. A derivation containing the default
-     GRUB configuration to be copied to `/etc/default/grub`.  The default is
-     ```
+   * `grubDefault`. **Optional**. An attribute set of store paths that
+     consist of a single file in the format required by
+     `/etc/default/grub`. If the attribute `default` does not exist,
+     it is added with the value
+
+	```
      GRUB_DEFAULT=0
      GRUB_TIMEOUT=5
-     GRUB_DISTRIBUTOR="${NOS}"
-     GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0,57600n8"
+     GRUB_CMDLINE_LINUX_DEFAULT="console=ttyS0"
      GRUB_CMDLINE_LINUX=""
      GRUB_TERMINAL="console"
      ```
-     Alternatively, `/etc/default/grub` can also be set through
-     `fileTree`.
+
+	 The file associated with the `default` attribute is copied to
+     `/etc/default/grub`. All other files are installed as
+     `/etc/default/grub-plaforms/<attribute-name>`.  At install time,
+     it is checked whether the file
+     `/etc/default/grub-plaforms/<onie_machine>` exists. If so, it is
+     copied to `/etc/default/grub`, then `/etc/default/grub-platforms`
+     is deleted. This implies that the attributes in this set are
+     valid ONIE machine identifiers.
+
+     Note that if `fileTree` also contains a file `/etc/default/grub`,
+     it will take precedence.
    * `component`. **Optional**. An arbitrary string that will be
      written to a file named `component` in the derivation produced by
-     this function. It can be used by the Hyrda CI system to perform
+     this function. It can be used by the Hydra CI system to perform
      some action in the `post-build-hook` (e.g. copy it to a location
      where it can be made available for download). The default is an
      empty string.
-   * `version`. **Optional**. An aribtrary sring conveying version
+   * `version`. **Optional**. An arbitrary string conveying version
      information about the service provided by `rootPaths`. It is
      written to a file named `version` in the derivation produced by
      this function. The purpose is the same as that of
@@ -136,7 +148,8 @@ The installer is built in a VM, i.e. the build host must provide the
      a chroot for all following actions.
    * Call `debootstrap` to create the base root file system
    * Set `localhost` as host name.
-   * Copy `grubDefault` to `/etc/default/grub`
+   * Create `/etc/default/grub` and `/etc/default/grub-platforms` from
+     `grubDefault`
    * Copy `fileTree` to the root file system. This can overwrite the
      host name and set the time zone and locale if desired, for
      example.
@@ -147,8 +160,8 @@ The installer is built in a VM, i.e. the build host must provide the
         * `--no-modify-profile`
         * `--daemon-user-count 12`
    * Add binary caches
-   * If `rootPaths` is not an empty list
-      * Copy the closure of `rootPaths` to the Nix store
+   * If `rootPaths` is not an empty list, copy the closure of
+     `rootPaths` to the Nix store.
    * If `postRootFsCreateCmd` is not `null`, execute it in the
      `chroot` environment of the root file system.
    * If `postRootFsInstallCmd` is not `null`, copy it to the
@@ -156,7 +169,7 @@ The installer is built in a VM, i.e. the build host must provide the
 
 The final root file system is then archived and compressed with
 `xz`. The installer is created as a self-extracting archive using the
-convetions expected by ONIE.
+conventions expected by ONIE.
 
 The installer can be executed on a target booted into ONIE "install
 mode" with
@@ -174,7 +187,7 @@ The installer performs the following steps:
    * Create partition #3 as the new root file system and use all of
      the remaining space on the install target for it
    * Format the partition with Ext3
-   * Unpack the root file system
+   * Unpack the root file system onto partition #3
    * The `tar` command supplied by the ONIE installer does not
      preserve modification time stamps, which corrupts `/nix/store`.
      This is fixed by resetting all time stamps to epoch 0
@@ -182,7 +195,7 @@ The installer performs the following steps:
      `chroot` environment of the root file system, then delete the
      file. The main purpose of this step is to allow for
      platform-dependent configurations.
-   * Install GRUB and add a boot menue entry to chain-load the ONIE
+   * Install GRUB and add a boot menu entry to chain-load the ONIE
      installer
    * Set the EFI boot order to prefer booting from the new partition
    * Reboot into the new system
