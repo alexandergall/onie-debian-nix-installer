@@ -95,6 +95,31 @@ The function takes the following arguments
    * `rootPassword`. **Optional**. The root password in clear
      text. Root logins are only allowed on the serial console when the
      image boots for the first time. The default is an empty string.
+   * `users`. **Optional**. An attribute set of user accounts to
+     create. The names of the attributes are the names of the accounts
+     and their values are sets of the form
+	 ```
+	 {
+	   password = "..."; # optional, default none
+	   useraddArgs = "..."; # optional, default ""
+	   sshPublicKey = "..."; # optional, default ""
+	   sudo = true | false; # optional, default true
+	   passwordlessSudo = true | false; #optional, default true
+     }
+	 ```
+	 The accounts are created right before the
+     `postRootFsCreateCmd`. The account is created inside the chroot
+     with
+	 ```
+	 useradd ${useraddArgs} ${user}
+	 ```
+	 If the `password` attribute exists, it's value is set as the
+     user's password, otherwise the password is disabled.
+	 If `sshPublicKey` is a non-empty string, it is copied to
+     `/home/${user}/.ssh/authorized_keys`. If `sudo` is `true`, the
+     string `${user} ALL=(ALL:ALL) ALL` is written to
+     `/etc/sudoers.d/${user}`. If `passwordlessSudo` is `true`, the
+     `NOPASSWD:` attribute is added as well.
    * `installerName`. **Optional**. The name of the final ONIE
      installer executable. The default is `onie-installer.bin`.
    * `NOS`. **Optional**. The name of the "Network Operating System"
@@ -160,6 +185,7 @@ The installer is built in a VM, i.e. the build host must provide the
         * `--no-modify-profile`
         * `--daemon-user-count 12`
    * Add binary caches
+   * Create user accounts from the `users` argument.
    * If `rootPaths` is not an empty list, copy the closure of
      `rootPaths` to the Nix store.
    * If `postRootFsCreateCmd` is not `null`, execute it in the

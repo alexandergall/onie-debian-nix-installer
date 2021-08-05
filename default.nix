@@ -28,6 +28,8 @@
   ## Initial root password.  The default sshd config does
   ## not allow root logins with password authentication.
 , rootPassword ? ""
+  ## Set of users to create
+, users ? {}
   ## Name of the installer binary, will have ".bin" appended
 , installerName ? "onie-installer"
   ## Name to use as the NOS, used as partition label and in
@@ -87,6 +89,30 @@ let
         GRUB_TERMINAL="console"
       '';
     } // grubDefault));
+  mkUser = user: spec':
+    let
+      spec = {
+        useraddArgs = "";
+        sshPublicKey = "";
+        sudo = true;
+        passwordlessSudo = true;
+      } // spec';
+    in ''
+      exec_chroot useradd ${spec.useraddArgs} ${user}
+    '' + lib.optionalString (spec ? password) ''
+      echo "${user}:${spec.password}" | chpasswd --root $chroot -c SHA256
+    '' + ''
+      if [ -n "${spec.sshPublicKey}" ]; then
+         mkdir -p $chroot/home/${user}/.ssh
+         echo ${spec.sshPublicKey} >$chroot/home/${user}/.ssh/authorized_keys
+      fi
+      exec_chroot chown -R ${user}:${user} /home/${user}
+      if [ -n "${builtins.toString spec.sudo}" ]; then
+        echo "${user} ALL=(ALL:ALL) ${if spec.passwordlessSudo then "NOPASSWD:" else ""} ALL" >$chroot/etc/sudoers.d/${user}
+      fi
+    '';
+  mkUsers = with builtins;
+    concatStringsSep "\n" (lib.attrValues (mapAttrs mkUser users));
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
     inherit memSize;
@@ -180,6 +206,7 @@ in vmTools.runInLinuxVM (
       cat ${rootClosureInfo}/registration | exec_chroot /nix/var/nix/profiles/default/bin/nix-store --load-db
     fi
   '' +
+   mkUsers +
    (lib.optionalString (postRootFsCreateCmd != null) ''
      cp ${postRootFsCreateCmd} $chroot/cmd
      exec_chroot /cmd
