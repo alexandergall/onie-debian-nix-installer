@@ -104,7 +104,7 @@ let
     '' + ''
       if [ -n "${spec.sshPublicKey}" ]; then
          mkdir -p $chroot/home/${user}/.ssh
-         echo ${spec.sshPublicKey} >$chroot/home/${user}/.ssh/authorized_keys
+         echo "${spec.sshPublicKey}" >$chroot/home/${user}/.ssh/authorized_keys
       fi
       exec_chroot chown -R ${user}:${user} /home/${user}
       if [ -n "${builtins.toString spec.sudo}" ]; then
