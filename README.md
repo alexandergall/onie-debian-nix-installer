@@ -92,6 +92,14 @@ The function takes the following arguments
    * `fileTree`. **Optional**. A derivation containing a directory
      tree which will be copied onto the root file system of the image
      after `debootstrap` is executed. The default is an empty tree.
+     The tree may contain the top-level directory `__platforms` that
+     contains subdirectories named after valid ONIE machine
+     identifiers (e.g. `accton_wedge100bf_32x`) to support
+     platform-specific file trees. When an image is installed on a
+     target system, the installer checks for the presence of
+     `/__platforms/<onie-machine>`. If it exists, its contents is
+     copied to `/`. The directory `/__platforms` is deleted at the end
+     of the installation in any case.
    * `rootPassword`. **Optional**. The root password in clear
      text. Root logins are only allowed on the serial console when the
      image boots for the first time. The default is an empty string.
@@ -177,7 +185,9 @@ The installer is built in a VM, i.e. the build host must provide the
      `grubDefault`
    * Copy `fileTree` to the root file system. This can overwrite the
      host name and set the time zone and locale if desired, for
-     example.
+     example. If `/__platforms/<onie-machine>` exists, its contents is
+     copied to `/`. The directory `/__platforms` is deleted at the end
+     of the installation in any case.
    * Set the root password to `rootPassword`
    * Install Nix in multi-user mode. The installer is called with the
      options

@@ -55,6 +55,14 @@ ln -s /proc/self/fd $root/dev/fd
 info "Fixing timestamps in Nix store"
 chroot $root find /nix/store -exec touch -h --date=@0 {} \;
 cp /etc/machine.conf $root/etc/
+. /etc/machine.conf
+
+fileTree=$root/__platforms/$onie_machine
+if [ -d $fileTree ]; then
+    info "Installing platform-dependent file tree for platform $onie_machine"
+    cp -r $fileTree/* $root/
+fi
+rm -rf /__platforms
 
 if [ -x $root/post-install-cmd ]; then
    info "Executing post-install command"
@@ -89,7 +97,6 @@ chmod a+x $root/etc/grub.d/42_ONIE_BOOT
 
 ## Install platform-specific GRUB defaults
 if [ -d $root/etc/default/grub-platforms ]; then
-    . /etc/machine.conf
     if [ -e $root/etc/default/grub-platforms/${onie_machine} ]; then
 	info "Installing GRUB default for $onie_machine"
 	mv $root/etc/default/grub-platforms/${onie_machine} $root/etc/default/grub
