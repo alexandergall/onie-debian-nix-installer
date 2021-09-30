@@ -126,10 +126,11 @@ in vmTools.runInLinuxVM (
       ${xz}/bin/xz -T0 rootfs.tar -c | cat >$out/rootfs.tar.xz
 
       echo "Creating payload"
+      mkdir $out/installer
+      cp rootfs-size $out/installer
+      cp ${./onie/install.sh} $out/installer/install.sh
+      echo ${NOS} >$out/installer/nos
       cd $out
-      mkdir installer
-      cp ${./onie/install.sh} installer/install.sh
-      echo ${NOS} >installer/nos
       ${gnutar}/bin/tar cf payload.tar installer rootfs.tar.xz
       rm -rf installer rootfs.tar.xz
 
@@ -221,6 +222,7 @@ in vmTools.runInLinuxVM (
     umount $chroot/proc
     umount $chroot/sys
 
+    echo $(du -s -B 1 $chroot | awk '{print $1}') >/tmp/xchg/rootfs-size
     tar -cf /tmp/xchg/rootfs.tar -C $chroot .
   '')
 )

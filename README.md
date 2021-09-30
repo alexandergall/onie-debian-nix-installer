@@ -218,6 +218,11 @@ The installer performs the following steps:
 
    * Select the block device on which ONIE is installed as
      installation target
+   * Estimate the required disk space by adding 20% to the size of the
+     root file system and compare it with the maximum size of a
+     partition that can be created on the block device.  The
+     installation is aborted if the space requirement is not met. In
+     this case, the existing disk layout is not changed.
    * Delete all partitions except the first two (the EFI boot loader
      and the ONIE installer)
    * Create partition #3 as the new root file system and use all of

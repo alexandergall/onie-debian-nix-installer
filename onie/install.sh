@@ -20,7 +20,39 @@ NOS="$(cat installer/nos)"
 info "Installing $NOS on ${disk}"
 sgdisk -p ${disk}
 
-for p in $(seq 3 9); do
+## Delete all partitions except the first 2 (EFI boot loader and ONIE
+## boot partition)
+partsToDelete=
+delOpts=
+for p in $(sgdisk -p ${disk} | awk '/^ +[0-9]+ +/ {print $1}'); do
+    [ $p -eq 1 -o $p -eq 2 ] && continue
+    partsToDelete="$partToDelete $p"
+    delOpts="$delOpts -d $p"
+done
+
+info "Checking disk space"
+sectorSize=$(sgdisk -p ${disk} | awk '/Logical sector size:/ { print $4 }')
+partSize=$(($(sgdisk --pretend $delOpts -N 3 -i 3 ${disk} | \
+		  awk '/Partition size:/ { print $3}') * $sectorSize))
+rootFsSize=$(cat installer/rootfs-size)
+## Make a guess about how large the partition should be to end up with
+## a usable system. This should accomodate the file system overhead
+## and some spare space to run the system.
+estimatedSize=$(echo $rootFsSize | awk '{print $1 * 1.2}')
+if [ $estimatedSize -gt $partSize ]; then
+    echo -e "\033[01;32m"
+    echo "It looks like the disk ${disk} does not have enough"
+    echo "room for a usable system.  The maximum size of the"
+    echo "new parition is ${partSize} bytes, but the root file"
+    echo "system with an estimated overhead of 20% is ${estimatedSize} bytes."
+    echo -en "\033[01;31m"
+    echo "The installation process is aborted, no changes have been made to the system."
+    echo "You may have to use efibootmgr to change the boot oder."
+    echo -en "\033[0m"
+    exit 1
+fi
+
+for p in $partsToDelete; do
     if [ -e ${disk}$p ]; then
        info "Deleting partition ${disk}$p"
        sgdisk -d $p ${disk}
