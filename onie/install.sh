@@ -38,7 +38,7 @@ rootFsSize=$(cat installer/rootfs-size)
 ## Make a guess about how large the partition should be to end up with
 ## a usable system. This should accomodate the file system overhead
 ## and some spare space to run the system.
-estimatedSize=$(echo $rootFsSize | awk '{print $1 * 1.2}')
+estimatedSize=$(echo $rootFsSize | awk '{print int($1 * 1.2)}')
 if [ $estimatedSize -gt $partSize ]; then
     echo -e "\033[01;32m"
     echo "It looks like the disk ${disk} does not have enough"
