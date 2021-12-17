@@ -116,6 +116,7 @@ let
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
     inherit memSize;
+    enableParallelBuilding = true;
     buildInputs = [ debootstrap mount umount shadow rsync ];
     postVM = ''
       cd xchg
