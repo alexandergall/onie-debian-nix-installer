@@ -62,6 +62,9 @@ The function takes the following arguments
    * `rootPaths`. **Optional**. A list of derivations whose closure
      will be installed in the Nix store of the image. The default is
      an empty list.
+   * `holdPackages`. **Optional**. A list of package names that will
+     be marked to be held back from upgrading with `apt-mark
+     hold`. The default is an empty list.
    * `postRootFsCreateCmd`. **Optional**. A command that is executed
      after the root file system is created (including installation of
      Nix). The command is executed in a `chroot` environment of the

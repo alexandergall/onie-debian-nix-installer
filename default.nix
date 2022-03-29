@@ -18,6 +18,9 @@
   ## A derivation containing a bootstrap profile created by
   ## mk-profile.sh
 , bootstrapProfile
+  ## A list of packages to set on "hold" to avoid accidental
+  ## upgrades
+, holdPackages ? []
   ## A derivation containing a directory tree to be copied
   ## into the root file system after bootstrapping
 , fileTree ? (stdenv.mkDerivation {
@@ -115,7 +118,7 @@ let
     concatStringsSep "\n" (lib.attrValues (mapAttrs mkUser users));
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
-    inherit memSize;
+    inherit memSize holdPackages;
     enableParallelBuilding = true;
     buildInputs = [ debootstrap mount umount shadow rsync ];
     postVM = ''
@@ -161,6 +164,10 @@ in vmTools.runInLinuxVM (
     mount -t devpts devpts $chroot/dev/pts
     ln -s /proc/self/fd $chroot/dev/fd
     exec_chroot apt-get clean
+    if [ -n "$holdPackages" ]; then
+      echo "Pinning packages: $holdPackages"
+      exec_chroot apt-mark hold $holdPackages
+    fi
     exec_chroot /usr/sbin/update-initramfs -u
     echo "localhost" >$chroot/etc/hostname
     if [ "$(ls -A ${fileTree})" ]; then
