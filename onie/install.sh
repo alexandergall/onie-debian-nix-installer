@@ -26,7 +26,7 @@ partsToDelete=
 delOpts=
 for p in $(sgdisk -p ${disk} | awk '/^ +[0-9]+ +/ {print $1}'); do
     [ $p -eq 1 -o $p -eq 2 ] && continue
-    partsToDelete="$partToDelete $p"
+    partsToDelete="$partsToDelete $p"
     delOpts="$delOpts -d $p"
 done
 
