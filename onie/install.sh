@@ -86,8 +86,8 @@ ln -s /proc/self/fd $root/dev/fd
 ## timestamps. Fix at least the store paths.
 info "Fixing timestamps in Nix store"
 chroot $root find /nix/store -exec touch -h --date=@0 {} \;
-cp /etc/machine.conf $root/etc/
 . /etc/machine.conf
+echo "onie_machine=$onie_machine" >$root/etc/machine.conf
 
 fileTree=$root/__platforms/$onie_machine
 if [ -d $fileTree ]; then
