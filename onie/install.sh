@@ -102,16 +102,17 @@ if [ -x $root/post-install-cmd ]; then
    rm $root/post-install-cmd
 fi
 
-info "Installing GRUB"
-echo "UUID=$ROOT_UUID / ext4 errors=remount-ro 0 1" > $root/etc/fstab
-echo "${disk}1 /boot/efi vfat umask=0077 0 1" >> $root/etc/fstab
-echo "tmpfs /tmp tmpfs defaults 0 0" >> $root/etc/fstab
-mkdir -p $root/boot/efi
-chroot $root mount /boot/efi
-
 for str in $(blkid ${disk}1); do
     echo $str | grep UUID= >/dev/null && eval $str
 done
+EFI_UUID=$UUID
+
+info "Installing GRUB"
+echo "UUID=$ROOT_UUID / ext4 errors=remount-ro 0 1" > $root/etc/fstab
+echo "UUID=$EFI_UUID /boot/efi vfat umask=0077 0 1" >> $root/etc/fstab
+echo "tmpfs /tmp tmpfs defaults 0 0" >> $root/etc/fstab
+mkdir -p $root/boot/efi
+chroot $root mount /boot/efi
 
 cat <<EOF >$root/etc/grub.d/42_ONIE_BOOT
 #!/bin/sh
@@ -120,7 +121,7 @@ set -e
 echo "Adding Menu entry to chainload ONIE"
 cat <<EOF
 menuentry ONIE {
-  search --no-floppy --fs-uuid --set=root "$UUID"
+  search --no-floppy --fs-uuid --set=root "$EFI_UUID"
   echo 'Loading ONIE ...'
   chainloader /EFI/onie/grubx64.efi
 }
@@ -146,7 +147,12 @@ fi
 ## new loader in /boot/efi/EFI depending on the setting of
 ## GRUB_DISTRIBUTOR. That will not be a problem.
 bootloader_id=grub
+## update-grub needs the device-to-uuid mapping to generate the
+## UUID-based root= kernel parameter
+mkdir -p $root/dev/disk/by-uuid
+ln -s ../../..$NOS_disk $root/dev/disk/by-uuid/$ROOT_UUID
 chroot $root update-grub
+cat /mnt/boot/grub/grub.cfg
 chroot $root grub-install --bootloader-id=${bootloader_id} ${disk}
 
 info "Updating EFI boot order"
