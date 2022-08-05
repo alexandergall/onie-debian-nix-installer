@@ -152,7 +152,6 @@ bootloader_id=grub
 mkdir -p $root/dev/disk/by-uuid
 ln -s ../../..$NOS_disk $root/dev/disk/by-uuid/$ROOT_UUID
 chroot $root update-grub
-cat /mnt/boot/grub/grub.cfg
 chroot $root grub-install --bootloader-id=${bootloader_id} ${disk}
 
 info "Updating EFI boot order"
