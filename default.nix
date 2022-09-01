@@ -61,8 +61,8 @@
 
 let
   nix-installer = fetchurl {
-    url = https://releases.nixos.org/nix/nix-2.3.10/nix-2.3.10-x86_64-linux.tar.xz;
-    sha256 = "0d48fq1gs2r599qifwgmp8gb3wdgg3jnsyz1r078cbivslbwv81f";
+    url = https://releases.nixos.org/nix/nix-2.11.0/nix-2.11.0-x86_64-linux.tar.xz;
+    sha256 = "0173kk2zc7r2ql2pvlqwv1iwm9zv9nxbs66hl7x2v961pcnas926";
   };
   defaultBinaryCaches = [
     {
@@ -203,6 +203,7 @@ in vmTools.runInLinuxVM (
     extra-substituters = ${aggrBinaryCaches.url}
     trusted-substituters = ${aggrBinaryCaches.url}
     trusted-public-keys = ${aggrBinaryCaches.key}
+    extra-experimental-features = nix-command
     EOF
 
     rm $chroot/etc/sudoers.d/nix
