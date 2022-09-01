@@ -162,7 +162,7 @@ in vmTools.runInLinuxVM (
     ${cpGrubDefaults}
     mount -t devtmpfs devtmpfs $chroot/dev
     mount -t devpts devpts $chroot/dev/pts
-    ln -s /proc/self/fd $chroot/dev/fd
+    [ -h $chroot/dev/fd ] || ln -s /proc/self/fd $chroot/dev/fd
     exec_chroot apt-get clean
     if [ -n "$holdPackages" ]; then
       echo "Pinning packages: $holdPackages"
