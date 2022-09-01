@@ -196,7 +196,7 @@ in vmTools.runInLinuxVM (
     echo "sandbox = false" >$chroot/etc/nix/nix.conf
     mkdir $chroot/nix-installer
     tar -C $chroot/nix-installer -xf ${nix-installer} --strip-components 1
-    exec_chroot sudo -u nix sh -c 'export ALLOW_PREEXISTING_INSTALLATION=1; /bin/bash /nix-installer/install --daemon --no-channel-add --no-modify-profile --daemon-user-count 12 </dev/null'
+    exec_chroot sudo -u nix sh -c 'export ALLOW_PREEXISTING_INSTALLATION=1; /bin/bash /nix-installer/install --daemon --no-channel-add --no-modify-profile </dev/null'
     rm -rf $chroot/nix-installer
 
     cat <<EOF >>$chroot/etc/nix/nix.conf
