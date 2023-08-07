@@ -175,7 +175,7 @@ in vmTools.runInLinuxVM (
     fi
     exec_chroot sh -c 'hostname $(cat /etc/hostname)'
     exec_chroot locale-gen
-    echo "root:${rootPassword}" | chpasswd --root $chroot -c SHA256
+    echo "root:${rootPassword}" | exec_chroot chpasswd -c SHA256
 
     ### Install the Nix package manager in multi-user mode
     exec_chroot useradd nix
