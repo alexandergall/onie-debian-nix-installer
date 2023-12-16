@@ -103,7 +103,7 @@ let
     in ''
       exec_chroot useradd ${spec.useraddArgs} ${user}
     '' + lib.optionalString (spec ? password) ''
-      echo "${user}:${spec.password}" | chpasswd --root $chroot -c SHA256
+      echo "${user}:${spec.password}" | exec_chroot chpasswd -c SHA256
     '' + ''
       if [ -n "${spec.sshPublicKey}" ]; then
          mkdir -p $chroot/home/${user}/.ssh
