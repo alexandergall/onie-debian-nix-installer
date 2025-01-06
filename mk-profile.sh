@@ -26,15 +26,17 @@ usage () {
     exit 1
 }
 
-default_packages="linux-image-amd64,initramfs-tools,sudo,zip,unzip,\
-                  openssh-server,openssh-client,telnet,grub-efi-amd64,\
-                  efibootmgr,acpi,ethtool,net-tools,wget,curl,rsync,locales,\
-                  ca-certificates,dbus,xz-utils,emacs-nox"
+packages="linux-image-amd64,initramfs-tools,sudo,zip,unzip,\
+          openssh-server,openssh-client,telnet,grub-efi-amd64,\
+          efibootmgr,acpi,ethtool,net-tools,wget,curl,rsync,locales,\
+          ca-certificates,dbus,xz-utils,emacs-nox"
 [ $# -ge 1 ] || usage
 release=$1
 shift
-[ $# -le 1 ] || usage
-packages="$(echo $default_packages${1:+,$1} | sed -e 's/ *//g')"
+for pkg in $@; do
+    packages="$packages${pkg:+,$pkg}"
+done
+packages=$(echo $packages | sed -e 's/ *//g')
 
 echo "Creating bootstrap profile for Debian $release"
 
