@@ -65,23 +65,26 @@ The function takes the following arguments
    * `holdPackages`. **Optional**. A list of package names that will
      be marked to be held back from upgrading with `apt-mark
      hold`. The default is an empty list.
-   * `postRootFsCreateCmd`. **Optional**. A command that is executed
-     after the root file system is created (including installation of
-     Nix). The command is executed in a `chroot` environment of the
-     root file system. `postRootFsCreateCmd` must be a derivation that
-     evaluates to a single executable in the Nix store.  The default
-     is `null` which disables the feature.
-   * `postRootFsInstallCmd`. **Optional**. A command that is executed
-     after the root file system has been installed on the installation
-     target during the ONIE installation. The command is executed in a
-     `chroot` environment of the root file system.  At that stage, the
-     install target's platform type is available from the file
+   * `postRootFsCreateCmds`. **Optional**. A list of commands that are
+     executed after the root file system is created (including
+     installation of Nix). The commands and their closures are copied
+     to the `chroot` environment of the root file system and executed
+     therein. Each command must be a derivation that evaluates to a
+     single executable in the Nix store.  The default is an empty
+     list.
+   * `postRootFsInstallCmds`. **Optional**. A list of commands that
+     are executed after the root file system has been installed on the
+     installation target during the ONIE installation. The commands
+     and their closures are copied to the `chroot` environment of the
+     root file system when the installer is created. When executed
+     during the installation of the image on the install target, the
+     target's platform type is available from the file
      `/etc/machine.conf` in the `chroot` environment. The file is a
      copy of `machine.conf` from the ONIE install partition. It can be
      sourced as a shell script, which makes the platform available as
-     the `onie_machine` variable.  `postRootFsInstallCmd` must be a
-     derivation that evaluates to a single executable in the Nix
-     store.  The default is `null` which disable the feature.
+     the `onie_machine` variable.  The commands must be a derivations
+     that evaluate to a single executable in the Nix store.  The
+     default is an empty list.
    * `binaryCaches`. **Optional**. A list of binary caches to add to
      the Nix configuration `/etc/nix/nix.conf` in addition to the
      standard Nix binary cache. Each item in the list must be a set
@@ -201,10 +204,13 @@ The installer is built in a VM, i.e. the build host must provide the
    * Create user accounts from the `users` argument.
    * If `rootPaths` is not an empty list, copy the closure of
      `rootPaths` to the Nix store.
-   * If `postRootFsCreateCmd` is not `null`, execute it in the
-     `chroot` environment of the root file system.
-   * If `postRootFsInstallCmd` is not `null`, copy it to the
-     root file system as `/post-install-cmd`.
+   * For each derivation in `postRootFsCreateCmds`, copy its closure
+     to the Nix store, then execute it in the `chroot` environment of
+     the root file system.
+   * For each derivation in `postRootFsInstallCmds`, copy its closure
+     to the Nix store, then create a new shell script that executes
+     all commands in order and copy it to the root file system as
+     `/post-install-cmd`.
 
 The final root file system is then archived and compressed with
 `xz`. The installer is created as a self-extracting archive using the

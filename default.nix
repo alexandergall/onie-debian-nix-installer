@@ -1,16 +1,17 @@
 { lib, stdenv, callPackage, fetchurl, vmTools, runCommand, debootstrap,
-  mount, umount, shadow, rsync, gnutar, xz, gnused, gawk, closureInfo }:
+  mount, umount, shadow, rsync, gnutar, xz, gnused, gawk, closureInfo,
+  writeShellScript }:
 
 {
   ## List of paths whose closure will be added to the Nix store
   ## of the install image
   rootPaths ? []
-  ## A command that will be executed inside a chroot after Nix has
-  ## been installed into the root file system
-, postRootFsCreateCmd ? null
-  ## A command that will be executed inside a chroot after unpacking
-  ## the root file system on the installation target
-, postRootFsInstallCmd ? null
+  ## An list of commands that will be executed inside a chroot after
+  ## Nix has been installed into the root file system
+, postRootFsCreateCmds ? []
+  ## An list of commands that will be executed inside a chroot after
+  ## unpacking the root file system on the installation target
+, postRootFsInstallCmds ? []
   ## A list of binary cache URL and keys to add to the image.
   ## Each element is an attribute set with attributes "name"
   ## and "key"
@@ -73,6 +74,11 @@ let
   aggrBinaryCaches = lib.foldAttrs (n: a: n + " " + a) "" (defaultBinaryCaches ++ binaryCaches);
   bootstrap = callPackage ./bootstrap-from-profile.nix { inherit bootstrapProfile; };
   rootClosureInfo = closureInfo { inherit rootPaths; };
+  finalPostRootFsInstallCmd = writeShellScript "final-post-install"
+    (builtins.concatStringsSep "\n" (map builtins.toString postRootFsInstallCmds));
+  cmdClosureInfo = builtins.map
+    (path: closureInfo { rootPaths = [ path ]; })
+    (postRootFsCreateCmds ++ [ finalPostRootFsInstallCmd ] );
   cpGrubDefault = platform: file:
     ''
       mkdir -p $chroot/etc/default/grub-platforms
@@ -118,7 +124,7 @@ let
     concatStringsSep "\n" (lib.attrValues (mapAttrs mkUser users));
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
-    inherit memSize holdPackages;
+    inherit memSize holdPackages cmdClosureInfo postRootFsCreateCmds finalPostRootFsInstallCmd;
     enableParallelBuilding = true;
     buildInputs = [ debootstrap mount umount shadow rsync ];
     postVM = ''
@@ -156,6 +162,12 @@ in vmTools.runInLinuxVM (
 
     exec_chroot () {
       chroot $chroot /bin/env PATH=/bin:/usr/bin:/sbin:/usr/sbin "$@"
+    }
+
+    copy_closure_to_chroot () {
+      closureInfo=$1
+      rsync -a $(cat $closureInfo/store-paths) $chroot/nix/store
+      cat $closureInfo/registration | exec_chroot /nix/var/nix/profiles/default/bin/nix-store --load-db
     }
 
     debootstrap --unpack-tarball=${bootstrap.tarball} ${bootstrap.release} $chroot
@@ -211,21 +223,21 @@ in vmTools.runInLinuxVM (
 
     if [ -s ${rootClosureInfo}/store-paths ]; then
       echo
-      echo "Copying closure to chroot"
-      rsync -a $(cat ${rootClosureInfo}/store-paths) $chroot/nix/store
-      cat ${rootClosureInfo}/registration | exec_chroot /nix/var/nix/profiles/default/bin/nix-store --load-db
+      echo "Copying service closure to chroot"
+      copy_closure_to_chroot ${rootClosureInfo}
     fi
   '' +
-   mkUsers +
-   (lib.optionalString (postRootFsCreateCmd != null) ''
-     cp ${postRootFsCreateCmd} $chroot/cmd
-     exec_chroot /cmd
-     rm $chroot/cmd
-   '') +
-   (lib.optionalString (postRootFsInstallCmd != null) ''
-     cp ${postRootFsInstallCmd} $chroot/post-install-cmd
-   '') +
-  ''
+  mkUsers + ''
+    echo "Copying hook closures to chroot"
+    for closure in $cmdClosureInfo; do
+      copy_closure_to_chroot $closure
+    done
+    for cmd in $postRootFsCreateCmds; do
+      echo "Executing post-fs-create hook"
+      exec_chroot $cmd
+    done
+    cp $finalPostRootFsInstallCmd $chroot/post-install-cmd
+
     umount $chroot/dev/pts
     umount $chroot/dev
     umount $chroot/proc
