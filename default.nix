@@ -73,12 +73,13 @@ let
   ];
   aggrBinaryCaches = lib.foldAttrs (n: a: n + " " + a) "" (defaultBinaryCaches ++ binaryCaches);
   bootstrap = callPackage ./bootstrap-from-profile.nix { inherit bootstrapProfile; };
-  rootClosureInfo = closureInfo { inherit rootPaths; };
   finalPostRootFsInstallCmd = writeShellScript "final-post-install"
     (builtins.concatStringsSep "\n" (map builtins.toString postRootFsInstallCmds));
-  cmdClosureInfo = builtins.map
-    (path: closureInfo { rootPaths = [ path ]; })
-    (postRootFsCreateCmds ++ [ finalPostRootFsInstallCmd ] );
+  closures = closureInfo {
+    rootPaths = rootPaths ++
+                postRootFsCreateCmds ++
+                [ finalPostRootFsInstallCmd ];
+  };
   cpGrubDefault = platform: file:
     ''
       mkdir -p $chroot/etc/default/grub-platforms
@@ -124,7 +125,7 @@ let
     concatStringsSep "\n" (lib.attrValues (mapAttrs mkUser users));
 in vmTools.runInLinuxVM (
   runCommand "onie-installer-debian-${bootstrap.release}" {
-    inherit memSize holdPackages cmdClosureInfo postRootFsCreateCmds finalPostRootFsInstallCmd;
+    inherit memSize holdPackages postRootFsCreateCmds finalPostRootFsInstallCmd;
     enableParallelBuilding = true;
     buildInputs = [ debootstrap mount umount shadow rsync ];
     postVM = ''
@@ -162,12 +163,6 @@ in vmTools.runInLinuxVM (
 
     exec_chroot () {
       chroot $chroot /bin/env PATH=/bin:/usr/bin:/sbin:/usr/sbin "$@"
-    }
-
-    copy_closure_to_chroot () {
-      closureInfo=$1
-      rsync -a $(cat $closureInfo/store-paths) $chroot/nix/store
-      cat $closureInfo/registration | exec_chroot /nix/var/nix/profiles/default/bin/nix-store --load-db
     }
 
     debootstrap --unpack-tarball=${bootstrap.tarball} ${bootstrap.release} $chroot
@@ -221,17 +216,12 @@ in vmTools.runInLinuxVM (
     rm $chroot/etc/sudoers.d/nix
     exec_chroot userdel nix
 
-    if [ -s ${rootClosureInfo}/store-paths ]; then
-      echo
-      echo "Copying service closure to chroot"
-      copy_closure_to_chroot ${rootClosureInfo}
-    fi
+    echo
+    echo "Copying closures to chroot"
+    rsync -a $(cat ${closures}/store-paths) $chroot/nix/store
+    cat ${closures}/registration | exec_chroot /nix/var/nix/profiles/default/bin/nix-store --load-db
   '' +
   mkUsers + ''
-    echo "Copying hook closures to chroot"
-    for closure in $cmdClosureInfo; do
-      copy_closure_to_chroot $closure
-    done
     for cmd in $postRootFsCreateCmds; do
       echo "Executing post-fs-create hook"
       exec_chroot $cmd
