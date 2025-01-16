@@ -114,11 +114,11 @@ echo "tmpfs /tmp tmpfs defaults 0 0" >> $root/etc/fstab
 mkdir -p $root/boot/efi
 chroot $root mount /boot/efi
 
-cat <<EOF >$root/etc/grub.d/42_ONIE_BOOT
+cat <<EOFEOF >$root/etc/grub.d/42_ONIE_BOOT
 #!/bin/sh
 set -e
 
-echo "Adding Menu entry to chainload ONIE"
+echo "Adding Menu entry to chainload ONIE" >&2
 cat <<EOF
 menuentry ONIE {
   search --no-floppy --fs-uuid --set=root "$EFI_UUID"
@@ -126,6 +126,7 @@ menuentry ONIE {
   chainloader /EFI/onie/grubx64.efi
 }
 EOF
+EOFEOF
 chmod a+x $root/etc/grub.d/42_ONIE_BOOT
 
 ## Install platform-specific GRUB defaults
