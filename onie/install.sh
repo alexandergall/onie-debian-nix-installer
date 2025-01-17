@@ -71,13 +71,14 @@ partprobe ${disk}
 info "Formatting root partition"
 ROOT_UUID=9e3f4c2b-0bb2-4ff1-b204-fc83d95d443e
 mkfs.ext3 -F -U $ROOT_UUID $NOS_disk
-root=/mnt
+root=$(mktemp -d)
 mkdir -p $root
 mount $NOS_disk $root
 
 info "Unpacking rootfs"
 tar xJf rootfs.tar.xz -C $root
 mount -t sysfs -o nodev,noexec,nosuid none $root/sys
+mount -t efivarfs -o rw,relatime none $root/sys/firmware/efi/efivars
 mount -t proc -o nodev,noexec,nosuid none $root/proc
 mount -t devtmpfs devtmpfs $root/dev
 mount -t devpts devpts $root/dev/pts
@@ -155,15 +156,20 @@ ln -s ../../..$NOS_disk $root/dev/disk/by-uuid/$ROOT_UUID
 chroot $root update-grub
 chroot $root grub-install --bootloader-id=${bootloader_id} ${disk}
 
-info "Updating EFI boot order"
 for b in $(efibootmgr | awk "/$NOS/ { print \$1 }"); do
   num=${b#Boot}
   num=${num%\*}
   info "Removing existing boot entry $b"
   efibootmgr -b $num -B
 done
+info "Adding primary boot entry for $NOS"
 efibootmgr -c -d ${disk} -p 1 -L "$NOS" -l "\EFI\\${bootloader_id}\grubx64.efi"
 
 sync
-reboot
+chroot $root umount /boot/efi
+umount $root/dev/pts $root/dev $root/proc $root/sys/firmware/efi/efivars $root/sys
+umount $root
+
+/bin/onie-nos-mode -s
+
 exit 0
