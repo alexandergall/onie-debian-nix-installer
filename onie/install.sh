@@ -167,9 +167,11 @@ efibootmgr -c -d ${disk} -p 1 -L "$NOS" -l "\EFI\\${bootloader_id}\grubx64.efi"
 
 sync
 chroot $root umount /boot/efi
-umount $root/dev/pts $root/dev $root/proc $root/sys/firmware/efi/efivars $root/sys
+umount $root/dev/pts
+umount $root/dev
+umount $root/proc
+umount $root/sys/firmware/efi/efivars
+umount $root/sys
 umount $root
-
-/bin/onie-nos-mode -s
 
 exit 0
