@@ -62,8 +62,8 @@
 
 let
   nix-installer = fetchurl {
-    url = https://releases.nixos.org/nix/nix-2.11.0/nix-2.11.0-x86_64-linux.tar.xz;
-    sha256 = "0173kk2zc7r2ql2pvlqwv1iwm9zv9nxbs66hl7x2v961pcnas926";
+    url = https://releases.nixos.org/nix/nix-2.31.2/nix-2.31.2-x86_64-linux.tar.xz;
+    sha256 = "0q4azlxwqvzrad4bgbwggvm7lc4waawvy25sci4225nhxs37rxni";
   };
   defaultBinaryCaches = [
     {
@@ -167,8 +167,11 @@ in vmTools.runInLinuxVM (
 
     debootstrap --unpack-tarball=${bootstrap.tarball} ${bootstrap.release} $chroot
     ${cpGrubDefaults}
+    mount -t sysfs /sys $chroot/sys
+    mount -t proc /proc $chroot/proc
     mount -t devtmpfs devtmpfs $chroot/dev
     mount -t devpts devpts $chroot/dev/pts
+
     [ -h $chroot/dev/fd ] || ln -s /proc/self/fd $chroot/dev/fd
     exec_chroot apt-get clean
     if [ -n "$holdPackages" ]; then
